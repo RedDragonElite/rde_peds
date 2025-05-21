@@ -3,9 +3,9 @@ game 'gta5'
 
 lua54 'yes'
 
-name 'rde_peds'
+name 'RDE | Peds | Advanced Ped Management System'
 author 'RDE SerpentsByte'
-version '1.0.0'
+version '1.0.2'
 description 'Advanced Ped Management System'
 
 shared_scripts {

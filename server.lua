@@ -16,9 +16,25 @@ CreateThread(function()
             `invincible` boolean DEFAULT true,
             `name` varchar(50) DEFAULT NULL,
             `speech` varchar(255) DEFAULT NULL,
+            `hostileWhenAttacked` boolean DEFAULT false,
             PRIMARY KEY (`id`)
         )
     ]])
+
+    -- Check if the column exists before adding it
+    local result = MySQL.query.await([[
+        SHOW COLUMNS FROM rde_pedmanager LIKE 'hostileWhenAttacked';
+    ]])
+
+    if not result or #result == 0 then
+        MySQL.query([[
+            ALTER TABLE rde_pedmanager
+            ADD COLUMN hostileWhenAttacked BOOLEAN DEFAULT FALSE;
+        ]])
+        print('^2[RDE | Peds]^7 Database schema updated successfully')
+    else
+        print('^2[RDE | Peds]^7 Column hostileWhenAttacked already exists')
+    end
 
     -- Load saved peds
     local savedPeds = MySQL.query.await('SELECT * FROM rde_pedmanager')
@@ -32,7 +48,8 @@ CreateThread(function()
                 scenario = ped.scenario,
                 invincible = ped.invincible,
                 name = ped.name,
-                speech = ped.speech
+                speech = ped.speech,
+                hostileWhenAttacked = ped.hostileWhenAttacked
             }
         end
         print('^2[RDE | Peds]^7 Loaded ' .. #savedPeds .. ' peds from database')
@@ -73,7 +90,7 @@ lib.callback.register('rde_peds:spawnPed', function(source, data)
         return false, 'Invalid Data'
     end
 
-    local result = MySQL.insert.await('INSERT INTO rde_pedmanager (model, x, y, z, heading, type, scenario, invincible, name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    local result = MySQL.insert.await('INSERT INTO rde_pedmanager (model, x, y, z, heading, type, scenario, invincible, name, hostileWhenAttacked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         {
             data.model,
             data.coords.x,
@@ -83,7 +100,8 @@ lib.callback.register('rde_peds:spawnPed', function(source, data)
             data.type,
             data.scenario,
             data.invincible,
-            data.name
+            data.name,
+            data.hostileWhenAttacked
         })
 
     if result then
@@ -204,6 +222,25 @@ lib.callback.register('rde_peds:setPedSpeech', function(source, pedId, speech)
         spawnedPeds[pedId].speech = speech
         TriggerClientEvent('rde_peds:setPedSpeech', -1, pedId, speech)
         print('^2[RDE | Peds]^7 Ped ' .. pedId .. ' speech set by ' .. GetPlayerName(source))
+        return true
+    end
+    return false, 'Database Error'
+end)
+
+lib.callback.register('rde_peds:setPedHostileWhenAttacked', function(source, pedId, hostileWhenAttacked)
+    if not isAdmin(source) then
+        return false, 'Access Denied'
+    end
+
+    if not spawnedPeds[pedId] then
+        return false, 'NPC not found'
+    end
+
+    local success = MySQL.update.await('UPDATE rde_pedmanager SET hostileWhenAttacked = ? WHERE id = ?', {hostileWhenAttacked, pedId})
+    if success then
+        spawnedPeds[pedId].hostileWhenAttacked = hostileWhenAttacked
+        TriggerClientEvent('rde_peds:setPedHostileWhenAttacked', -1, pedId, hostileWhenAttacked)
+        print('^2[RDE | Peds]^7 Ped ' .. pedId .. ' hostile setting updated by ' .. GetPlayerName(source))
         return true
     end
     return false, 'Database Error'
